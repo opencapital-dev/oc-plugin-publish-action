@@ -41,6 +41,11 @@ runs:
           -platforms "${{ inputs.platforms }}")
         echo "digest=$digest" >> "$GITHUB_OUTPUT"
         echo "DIGEST=$digest" >> "$GITHUB_ENV"
+    # --new-bundle-format (produces the v0.3 sigstore bundle referrer control-plane
+    # verifies) is a cosign v3.x flag; cosign-installer's default (v2.5.2) lacks it.
+    - uses: sigstore/cosign-installer@v3
+      with:
+        cosign-release: 'v3.0.6'
     - shell: bash
       run: |
         cosign sign --yes --new-bundle-format \
