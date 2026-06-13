@@ -1,0 +1,44 @@
+name: "OpenCapital plugin publish"
+description: "Assemble + sign + push a Grafana plugin to GHCR plugins-staging"
+inputs:
+  dir:
+    required: true
+    default: "."
+    description: "Path to the plugin source directory (must contain dist/)"
+  id:
+    required: true
+    description: "Plugin id (OCI repository name, e.g. oc-core-datasource)"
+  owner:
+    required: true
+    description: "GitHub owner/org (target: ghcr.io/<owner>/plugins-staging/<id>)"
+  version:
+    required: true
+    description: "OCI tag, e.g. v0.1.0"
+  platforms:
+    required: false
+    default: "linux-amd64,linux-arm64,darwin-amd64,darwin-arm64,windows-amd64"
+    description: "Comma-separated list of platforms to include"
+outputs:
+  digest:
+    description: "Pushed manifest digest (sha256:...)"
+    value: ${{ steps.push.outputs.digest }}
+runs:
+  using: composite
+  steps:
+    - id: push
+      shell: bash
+      env:
+        GHCR_TOKEN: ${{ github.token }}
+      run: |
+        digest=$(go run "${{ github.action_path }}/assemble" \
+          -dir "${{ inputs.dir }}" \
+          -id "${{ inputs.id }}" \
+          -owner "${{ inputs.owner }}" \
+          -version "${{ inputs.version }}" \
+          -platforms "${{ inputs.platforms }}")
+        echo "digest=$digest" >> "$GITHUB_OUTPUT"
+        echo "DIGEST=$digest" >> "$GITHUB_ENV"
+    - shell: bash
+      run: |
+        cosign sign --yes --new-bundle-format \
+          "ghcr.io/${{ inputs.owner }}/plugins-staging/${{ inputs.id }}@${DIGEST}"
