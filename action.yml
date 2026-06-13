@@ -30,7 +30,10 @@ runs:
       env:
         GHCR_TOKEN: ${{ github.token }}
       run: |
-        digest=$(go run "${{ github.action_path }}/assemble" \
+        # Build the assembler in its OWN module dir (it is a separate module);
+        # `go run <path>` from the plugin's module rejects an out-of-module path.
+        ( cd "${{ github.action_path }}/assemble" && go build -o "${{ runner.temp }}/oc-assemble" . )
+        digest=$("${{ runner.temp }}/oc-assemble" \
           -dir "${{ inputs.dir }}" \
           -id "${{ inputs.id }}" \
           -owner "${{ inputs.owner }}" \
