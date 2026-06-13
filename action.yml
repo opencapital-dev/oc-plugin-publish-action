@@ -25,6 +25,14 @@ outputs:
 runs:
   using: composite
   steps:
+    # cosign uploads the signature referrer to GHCR, so the runner needs registry
+    # auth (keyless OIDC only handles the Fulcio cert, not the blob push). This is
+    # the canonical GitHub-native pattern; cosign reads the docker config it writes.
+    - uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     - id: push
       shell: bash
       env:
