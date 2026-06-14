@@ -48,6 +48,14 @@ func run(ctx context.Context, pluginDir, id, owner, version, token string, platf
 		return "", fmt.Errorf("push config blob: %w", err)
 	}
 
+	// Mirror repo-root dashboards/ + library-panels/ into dist/ once, before
+	// packaging any platform, so every per-platform tarball carries them. The
+	// footprint above is derived from plugin.json only, so this does not change
+	// it (promotion's footprint gate is unaffected).
+	if err := stageRootArtifacts(pluginDir); err != nil {
+		return "", fmt.Errorf("stage root artifacts: %w", err)
+	}
+
 	var layers []ocispec.Descriptor
 	for _, p := range platforms {
 		fmt.Fprintf(os.Stderr, ">>> packaging %s %s %s\n", id, version, p)

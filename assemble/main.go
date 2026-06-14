@@ -17,11 +17,18 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 )
+
+// rootArtifactDirs are the plugin repo-root directories that ship inside the
+// bundle but are not produced by the Grafana SDK / webpack build. The desktop
+// app's instance-bootstrap provisions them out of the installed bundle (it reads
+// <plugin>/dashboards and <plugin>/library-panels), so they must be packed.
+var rootArtifactDirs = []string{"dashboards", "library-panels"}
 
 // platformBinSuffix maps an artifact platform tag to the backend binary
 // filename suffix the Grafana plugin SDK produces.
@@ -148,6 +155,85 @@ func packagePlugin(pluginDir, id, version, platform string) (artifact, error) {
 		return artifact{}, err
 	}
 	return artifact{platform: platform, tarball: tarball}, nil
+}
+
+// stageRootArtifacts mirrors a plugin's repo-root dashboards/ and library-panels/
+// directories into dist/ so they ship inside the packaged tarball. The webpack
+// build's output.clean wipes dist/, and the Grafana SDK build does not copy
+// these non-standard dirs — so without this the published bundle carries no
+// dashboards or library panels for the desktop app to provision. This is the
+// CI-side equivalent of the plugin SDK's `mage CopyArtifacts`, enforced centrally
+// in the publish action so every plugin gets it without a per-repo build step.
+// A dir the plugin does not ship is a no-op (e.g. a datasource with neither).
+// Each destination is cleared first so a file dropped from a new bundle version
+// stops shipping (exact reconcile, mirroring the desktop provisioner).
+func stageRootArtifacts(pluginDir string) error {
+	dist := filepath.Join(pluginDir, "dist")
+	for _, name := range rootArtifactDirs {
+		src := filepath.Join(pluginDir, name)
+		info, err := os.Stat(src)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("stat %s: %w", src, err)
+		}
+		if !info.IsDir() {
+			continue
+		}
+		dst := filepath.Join(dist, name)
+		if err := os.RemoveAll(dst); err != nil {
+			return fmt.Errorf("clear %s: %w", dst, err)
+		}
+		if err := copyTree(src, dst); err != nil {
+			return fmt.Errorf("copy %s -> %s: %w", src, dst, err)
+		}
+		fmt.Fprintf(os.Stderr, ">>> staged %s/ into dist/\n", name)
+	}
+	return nil
+}
+
+// copyTree recursively copies the regular files under src into dst, recreating
+// the directory structure. Symlinks and special files are skipped (plugin
+// artifact dirs are plain JSON/text trees).
+func copyTree(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		return copyOneFile(path, target)
+	})
+}
+
+func copyOneFile(src, dst string) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 func writeTarGz(dest, srcDir string, names []string) (string, int64, error) {
