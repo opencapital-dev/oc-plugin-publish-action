@@ -1,4 +1,4 @@
-module github.com/ignacioballester/oc-plugin-publish-action/assemble
+module github.com/opencapital-dev/oc-plugin-publish-action/assemble
 
 go 1.25
 

@@ -48,7 +48,7 @@ jobs:
           go-version: "1.25"
       - name: Build plugin
         run: npm ci && npm run build && mage buildAll
-      - uses: ignacioballester/oc-plugin-publish-action@v1
+      - uses: opencapital-dev/oc-plugin-publish-action@v1
         with:
           dir: .
           id: oc-core-datasource
