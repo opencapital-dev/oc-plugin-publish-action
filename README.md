@@ -1,7 +1,8 @@
 # oc-plugin-publish-action
 
 Composite GitHub Action that assembles a Grafana plugin into an OpenCapital OCI
-artifact and pushes it to `ghcr.io/<owner>/plugins-staging/<id>:<version>`.
+artifact, pushes and signs it to `ghcr.io/<owner>/plugins/<id>:<version>`, and
+records the new version in the plugin's own `oc-plugin.json` manifest on `main`.
 
 The artifact structure:
 
@@ -14,8 +15,12 @@ The artifact structure:
 
 After the push, the action signs the manifest digest using cosign with the
 caller's GitHub Actions OIDC identity against public Sigstore (keyless,
-`--new-bundle-format`). The caller's job must grant `id-token: write` and
-`packages: write`.
+`--new-bundle-format`).
+
+Finally, the action commits an updated `oc-plugin.json` to the caller repo's
+`main` branch via the built-in `GITHUB_TOKEN` (own-repo write — no PAT, no
+cross-repo, no PR). The `versions[]` array is kept v-prefixed and sorted
+semver-descending. The manifest is created automatically on first publish.
 
 ## Inputs
 
@@ -33,6 +38,17 @@ caller's GitHub Actions OIDC identity against public Sigstore (keyless,
 |----------|---------------------------------|
 | `digest` | Pushed manifest digest (`sha256:...`) |
 
+## Permissions required
+
+The caller job must grant:
+
+```yaml
+permissions:
+  packages: write    # push OCI artifact + cosign signature to GHCR
+  id-token: write    # cosign keyless OIDC signing via Sigstore
+  contents: write    # bump manifest versions[] in oc-plugin.json on main
+```
+
 ## Usage
 
 ```yaml
@@ -41,6 +57,7 @@ jobs:
     permissions:
       packages: write
       id-token: write
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -55,3 +72,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           version: v${{ env.VERSION }}
 ```
+
+After a successful run the image is at
+`ghcr.io/<owner>/plugins/<id>:<version>` and the caller repo's
+`oc-plugin.json` on `main` contains the new version in `versions[]`.

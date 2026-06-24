@@ -1,5 +1,5 @@
 name: "OpenCapital plugin publish"
-description: "Assemble + sign + push a Grafana plugin to GHCR plugins-staging"
+description: "Assemble + sign + push a Grafana plugin to GHCR plugins, then record the version in the plugin's own manifest"
 inputs:
   dir:
     required: true
@@ -10,7 +10,7 @@ inputs:
     description: "Plugin id (OCI repository name, e.g. oc-core-datasource)"
   owner:
     required: true
-    description: "GitHub owner/org (target: ghcr.io/<owner>/plugins-staging/<id>)"
+    description: "GitHub owner/org (target: ghcr.io/<owner>/plugins/<id>)"
   version:
     required: true
     description: "OCI tag, e.g. v0.1.0"
@@ -18,23 +18,6 @@ inputs:
     required: false
     default: "linux-amd64,linux-arm64,darwin-amd64,darwin-arm64,windows-amd64"
     description: "Comma-separated list of platforms to include"
-  catalog-repo:
-    required: false
-    default: "opencapital-dev/opencapital"
-    description: "owner/repo holding plugins.json (the marketplace catalog)."
-  catalog-channel:
-    required: false
-    default: "plugins"
-    description: >-
-      Channel the auto-PR adds the version to: 'plugins' (productive; merge =
-      live) or 'preview' (test channel; promote later).
-  catalog-token:
-    required: false
-    default: ""
-    description: >-
-      PAT/App token with contents:write + pull-requests:write on catalog-repo,
-      used to open the catalog PR cross-repo. When empty, the PR step is skipped
-      (the artifact is still published + signed to plugins-staging).
 outputs:
   digest:
     description: "Pushed manifest digest (sha256:...)"
@@ -81,16 +64,13 @@ runs:
       run: |
         cosign version
         cosign sign --yes --new-bundle-format \
-          "ghcr.io/${{ inputs.owner }}/plugins-staging/${{ inputs.id }}@${DIGEST}"
-    # Bridge publish -> catalog: open a PR on catalog-repo adding this version to
-    # plugins.json. Merging it triggers plugin-promote-reconcile (signature- +
-    # footprint-gated) which promotes staging -> trusted. Skipped if no token.
-    - name: open catalog PR
+          "ghcr.io/${{ inputs.owner }}/plugins/${{ inputs.id }}@${DIGEST}"
+    - name: bump manifest versions[]
       shell: bash
       env:
+        REPO: ${{ github.repository }}
         ID: ${{ inputs.id }}
+        OWNER: ${{ inputs.owner }}
         VERSION: ${{ inputs.version }}
-        CATALOG_REPO: ${{ inputs.catalog-repo }}
-        CATALOG_CHANNEL: ${{ inputs.catalog-channel }}
-        CATALOG_TOKEN: ${{ inputs.catalog-token }}
-      run: bash "${{ github.action_path }}/catalog-pr.sh"
+        GH_TOKEN: ${{ github.token }}
+      run: bash "${{ github.action_path }}/manifest-bump.sh"
