@@ -1,5 +1,5 @@
 // Command assemble packages a Grafana plugin into an OpenCapital OCI artifact
-// and pushes it to ghcr.io/<owner>/plugins-staging/<id>:<version>.
+// and pushes it to ghcr.io/<owner>/plugins/<id>:<version>.
 //
 // Usage:
 //
