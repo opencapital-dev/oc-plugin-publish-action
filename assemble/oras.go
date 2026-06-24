@@ -25,7 +25,7 @@ const (
 )
 
 // run assembles an OCI artifact from the plugin dir and pushes it to
-// ghcr.io/<owner>/plugins-staging/<id>:<version>. Returns the manifest digest.
+// ghcr.io/<owner>/plugins/<id>:<version>. Returns the manifest digest.
 func run(ctx context.Context, pluginDir, id, owner, version, token string, platforms []string) (string, error) {
 	pjPath := filepath.Join(pluginDir, "dist", "plugin.json")
 	pjBytes, err := os.ReadFile(pjPath)
@@ -89,7 +89,7 @@ func run(ctx context.Context, pluginDir, id, owner, version, token string, platf
 		return "", fmt.Errorf("tag manifest: %w", err)
 	}
 
-	repoRef := fmt.Sprintf("ghcr.io/%s/plugins-staging/%s", owner, id)
+	repoRef := fmt.Sprintf("ghcr.io/%s/plugins/%s", owner, id)
 	repo, err := remote.NewRepository(repoRef)
 	if err != nil {
 		return "", fmt.Errorf("repository %q: %w", repoRef, err)
