@@ -18,6 +18,10 @@ inputs:
     required: false
     default: "linux-amd64,linux-arm64,darwin-amd64,darwin-arm64,windows-amd64"
     description: "Comma-separated list of platforms to include"
+  record_manifest:
+    required: false
+    default: "true"
+    description: "When false, skip the oc-plugin.json versions[] bump (the caller records it elsewhere, e.g. semantic-release)"
 outputs:
   digest:
     description: "Pushed manifest digest (sha256:...)"
@@ -66,6 +70,7 @@ runs:
         cosign sign --yes --new-bundle-format \
           "ghcr.io/${{ inputs.owner }}/plugins/${{ inputs.id }}@${DIGEST}"
     - name: bump manifest versions[]
+      if: inputs.record_manifest == 'true'
       shell: bash
       env:
         REPO: ${{ github.repository }}

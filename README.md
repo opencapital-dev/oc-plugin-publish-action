@@ -31,6 +31,7 @@ semver-descending. The manifest is created automatically on first publish.
 | `owner`     | yes      |                                                                   | GitHub owner/org                                    |
 | `version`   | yes      |                                                                   | OCI tag, e.g. `v0.1.0`                              |
 | `platforms` | no       | `linux-amd64,linux-arm64,darwin-amd64,darwin-arm64,windows-amd64` | Comma-separated platform list                       |
+| `record_manifest` | no | `true` | When `false`, skip the `oc-plugin.json` `versions[]` bump (caller records it) |
 
 ## Outputs
 
